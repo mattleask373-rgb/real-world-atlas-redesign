@@ -1,451 +1,295 @@
-# ChatGPT build plan — one real-world ecosystem, ready for millions
+# ChatGPT overview — build one life app, then scale it
 
-**Who this is for:** ChatGPT (or any coding agent) working on Real World Atlas / The Living World.
-**Canonical code:** https://github.com/mattleask373-rgb/life-lived-network
-**Live site today:** https://life-lived-network.lovable.app (it lags `main`. `/explore` is 404 there. Do not treat the site as the source of truth.)
+**Who this is for:** ChatGPT working on Real World Atlas / The Living World.
+**Canonical code:** https://github.com/mattleask373-rgb/life-lived-network (`main` `c48599ee574c275737df31b4db73ea50dec23ebb`, 24 Oct 2026).
+**Live site:** https://life-lived-network.lovable.app — this is behind `main`. Checked 25 Oct 2026: home 200, `/explore` 404, `/sitemap.xml` 404, `robots.txt` is a blanket allow with no private-route rules and no sitemap.
 **Visual reference only:** https://github.com/mattleask373-rgb/real-world-atlas-redesign
-**Prior architecture note:** https://github.com/mattleask373-rgb/life-lived-network/pull/410
-**Status of this file:** execution plan. It does not authorise a merge, a deploy, a new database, or a public model.
+**Earlier notes:** pull requests #410 and #411. This file replaces #411 as the plan to follow.
+**This file does not authorise a merge, a deploy, a scrape, a payment system, or a public model.**
 
-The owner’s brief, in one line: stop scrolling and become part of a global community of like-minded people, with the useful parts of daily life in one ecosystem.
-
----
-
-## 0. How to use this document
-
-1. Read this file once before any edit.
-2. Then read, in the canonical repo: `docs/agents/EXTERNAL-COLLABORATORS.md`, `docs/agents/INVARIANTS.md`, `docs/adr/001-canonical-supply-engine.md`, both ADR 003s, `docs/ai/GROUNDED-ASSISTANT-AND-GLOBAL-INTEGRATION.md`, `docs/ai/grounded-matching.md`.
-3. Do the **next unblocked task** in section 15. One pull request. Stop.
-4. Do not invent a parallel app, a parallel matcher, or sample people to make a city look alive.
-
-Working rules:
-
-- Branch: `agent/chatgpt/<short-task>`. Never push `main`. Never force-push. Never merge. A human merges.
-- Do not edit `src/integrations/supabase/*`, `src/routeTree.gen.ts`, `.env`, `supabase/config.toml`.
-- Do not add a migration that drops, renames, or weakens RLS.
-- If Lovable touched a file in the last day, comment, do not edit it.
-- CI in `.github/workflows/verify.yml` must pass. Do not weaken a test.
-- Extend `src/lib/supply-engine.ts`. Do not create a second discovery engine, a vector database, or a recommendation graph.
-- Unknown stays unknown. Quiet is a valid result. Fixtures never become production data.
+Heartbeat: stop scrolling. One place, everything that is actually happening, organised so a person can act and put the phone away.
 
 ---
 
-## 1. Product
+## 0. How ChatGPT must work
 
-People open the app to leave it. The session ends in the real world: a shift, a gig, a room with music, a garden that needs hands, a week on a project, an afternoon learning something with a local.
-
-It is one ecosystem, not five startups glued together:
-
-| Door | What the person feels | First supply | Later supply |
-|---|---|---|---|
-| What’s happening here | Tonight and this week, near me | Licensed event APIs | Venues, artists, and neighbours posting a real night |
-| Work, longer | A job that is actually listed | Adzuna adapter already in the repo. Add another board only with a contract | Employers posting here |
-| Work, short | Cleaning, gardening, a day’s labour, a pair of hands | Member offers, with hours and an expiry | Repeat hosts, still not a score |
-| Music | A room, a band, a fan, a venue, without a promoter in the middle | Ticketed shows from an API, clearly sourced | Artist + venue agree a night inside the app |
-| Community projects | Weeks, not gigs. Somewhere to stay and something to do. In the spirit of WWOOF and Workaway. Do not use their names in the product | Member-hosted projects | A density of projects in a region |
-| With a local | Learn a language, cross a set of islands, cook a meal. In the spirit of GetYourGuide, hosted by a person | Member-hosted sessions | The same, with confirm-before-you-pay |
-| People like you | You meet because of the thing, not because of a feed | The record you both showed up for | A life list and a conversation, still not a follower graph |
-
-The heartbeat is the opposite of a doom scroll. No infinite ranked feed. No global star rating. No “people you may know” built from surveillance. Three honest things, then an action.
+1. Read this file.
+2. Read in the canonical repo: `docs/agents/EXTERNAL-COLLABORATORS.md`, `docs/agents/INVARIANTS.md`, `docs/adr/001-canonical-supply-engine.md`, both ADR 003s, `docs/ai/GROUNDED-ASSISTANT-AND-GLOBAL-INTEGRATION.md`.
+3. Do the next unblocked task in section 12. One pull request. Stop.
+4. Branch `agent/chatgpt/<short-task>`. Never push `main`. Never force-push. Never merge.
+5. Do not edit `src/integrations/supabase/*`, `src/routeTree.gen.ts`, `.env`, `supabase/config.toml`.
+6. Do not weaken RLS or tests.
+7. If Lovable edited a file in the last day, comment, do not edit it.
+8. Extend `findSupply()`. No second matcher, no vector database, no second app.
+9. Unknown stays unknown. Quiet is a valid screen. Fixtures never become production data.
+10. Do not scrape Deliveroo, Uber, Uber Eats, Just Eat, Indeed, Seek, Airbnb, Too Good To Go, Ticketmaster’s website, WWOOF, Workaway, or GetYourGuide. A new source needs a contract and a human yes.
 
 ---
 
-## 2. What is already built — do not rebuild it
+## 1. Independent review — 25 October 2026
 
-Repository `mattleask373-rgb/life-lived-network`, `main` at or after `c48599ee574c275737df31b4db73ea50dec23ebb`.
+Reviewed from `main`, the open pull-request queue, and the public Lovable site. Not a guess.
 
-| Already there | Where | Use it for |
+### Ready as foundations (do not rebuild)
+
+These are real code, with tests around them. They are the right base for global growth. They are **not** a live global product.
+
+| Piece | Evidence | What it already gives you |
 |---|---|---|
-| The only discovery engine | `src/lib/supply-engine.ts` `findSupply()` | Every door above. Bands: direct, local capability, open to opportunities, journey, community, contribution, skills exchange, related. Each band has a heading and a caveat. |
-| Geography | `src/lib/geo-scope.ts` | A need covers a place and what is inside it. A person matches only if they **declared** a service area. Passing through is not being available. Unknown place fails closed. |
-| Ranking | `src/lib/grounded-matching.ts` `groundedMatch()`, `threeHours()` | “I have a few hours.” Ranks records it is given. Does not fetch. Does not invent. |
-| Themes | `src/lib/explore-topics.ts`, `/explore`, `/explore/$topic` | Work, experiences, music, art, community, people, nature, food. A theme opens the same map. It is not proof the theme exists in that town. |
-| Place pages | `src/routes/$country.$place.tsx` and `$service` | The public face of a locality. |
-| Home, journey, road trip, give, need, make, profile, life list, conversations, memories, moderation | `src/routes/*` | The doors. Memories stay private and out of discovery. |
-| Jobs ingest | `src/lib/ingest/adzuna*.ts` | Longer-term work, with provenance. |
-| Events ingest | `src/lib/ingest/ticketmaster.ts` | What’s on, with provenance. |
-| Ingest contract | `src/lib/ingest/contract.ts`, `dedupe.ts`, `freshness.ts`, `normalise.ts`, `registry.ts`, `refresh.server.ts` | Every new source. |
-| Taxonomy | `src/lib/service-taxonomy.ts` | Categories. Extend it. Do not fork it. |
-| Hours | `src/lib/hours.ts` | Time bounds. |
-| Journey | `src/lib/journey-engine.ts` | A trip made of recorded things. |
-| Needs | `src/lib/needs.ts` | Someone asking. |
-| Draft assist | `src/lib/draft-assist.server.ts` | The only billable model. Lovable gateway, model id `openai/gpt-6-astra`, 800 output tokens, 0 retries, 30s. Kill switch `DRAFT_ASSIST_DISABLED=true`. Quota (5/hour, 20/day) is **not live** until issue #290 is proven. |
-| World records | `src/lib/world-data.ts`, `src/lib/listings.ts` | The public record shape. |
+| One discovery engine | `src/lib/supply-engine.ts` | Bands with caveats: direct, local capability, open to opportunities, journey, community, contribution, skills exchange, related. |
+| Geography | `src/lib/geo-scope.ts` | A person matches only if they declared a service area. Passing through is not being free. Unknown place fails closed. |
+| Ranking | `src/lib/grounded-matching.ts` | `groundedMatch()`, `threeHours()`. Ranks records it is given. Empty stays empty. |
+| Themes | `src/lib/explore-topics.ts` and `/explore` on `main` | Eight doors into the same map. Copy says a theme is not local stock. |
+| Place pages | `src/routes/$country.$place*.tsx` | A locality URL, not a fake city page. |
+| Ingest shape | `src/lib/ingest/contract.ts`, `normalise.ts`, `dedupe.ts`, `freshness.ts` | Source, provenance, expiry, dedupe. A failed refresh must not wipe a place. |
+| Ticketmaster | `ticketmaster.ts` registered in `registry.ts`. Network only in `refresh.server.ts`. Cap 2 pages / 120 events. | What’s-on can be asked per locality without the city name baked into code. |
+| Adzuna primitives | `src/lib/ingest/adzuna*.ts` | Turns a job-board payload into a staging record. The file itself says it does **not** call the network or publish. |
+| Home, journey, road trip, give, need, make, profile, life list, conversations, memories, moderation | `src/routes/*` | The doors exist. Memories stay private. |
+| Draft assist, dark | `draft-assist.server.ts` | Only billable model. 800 output tokens, 0 retries, 30s, kill switch. Quota is not a live control until #290. |
+| Rules | ADRs, invariants, external-collaborator doc | Agents already have a way to work without destroying `main`. |
 
-The redesign repo is look-and-feel only. Do not import `src/data/atlas.ts`, `src/lib/match.ts`, `src/lib/store.ts`, or `public/media/*` from it. Those are example cities and a toy matcher.
+### Not ready for global growth
 
-The live Lovable site is a **demo of Lisbon**. It says so. Leave that label until a row has a real source.
+| Gap | Evidence | Why it blocks scale |
+|---|---|---|
+| The public site is a demo | Lovable home is “Lisbon, a demo place.” `/explore` 404. | Shipping the GitHub app is not the same as people using it. Lovable is behind `main`. |
+| Search engines can see private paths | Live `robots.txt` allows everything. Sitemap 404. The repo’s robots file is stricter and is not what is deployed. | You cannot open the world until private routes stay private. |
+| Jobs do not flow yet | Adzuna is **not** in `registry.ts`. Registry is only `ticketmaster-discovery` and `fixture-source`. | “Indeed/Seek-style work” is a staging library, not a feed. |
+| Events are not a public live feed | Ticketmaster can be refreshed server-side. The site people open still shows demo pins. | A partner adapter on a branch is not a market. |
+| No cached locality bundle | Reads are not shaped as “one document per place”. | At millions of opens you would hit the database and the partner for every phone. |
+| Map is not the Airbnb interaction | Live map is an emoji grid under “What’s around you”, easy to miss. | The product has to be a map you can search, filter, and read as a list of the same pins. |
+| Thirty open pull requests | Includes geography pagination (#396, #397, #406), global coordinates (#390), destinations directory (#394), GeoNames manifest (#395), ingest atomicity (#403, #407), unknown price vs free (#391, #402). | Global work is in draft. `main` has not absorbed it. Do not start a rival version of these. |
+| Abuse controls | Issue #290. Draft quota migration not proven on a real database. | A public write form plus a model, without this, will be abused the week you are noticed. |
+| No steward, no “this place is live” flag in production | Readiness list exists only as a document. | You cannot turn on a country. You turn on a place. |
+| Payments, insurance, right-to-work, dispatch | Not built. | Delivery and removals cannot pretend to be Uber. |
+| Design | Live UI is “The Living World”, flat, emoji, no photo language, no phone tab bar. Redesign is a separate repo. Owner has not signed the visual merge. | Do not restyle and re-platform in one PR. |
+| Side repos | `real-world-atlas-agent-orchestration`, marketing, monetization, compliance are README-only. | They are not a running company system. |
 
----
+### Verdict
 
-## 3. One record, many doors
-
-Every door reads and writes the same public record. A new feature is a new way in, not a new database of “gigs” or “concerts” or “experiences”.
-
-A public record needs, at minimum:
-
-- Canonical place id (from the existing place hierarchy), never a raw GPS pin of a person.
-- Kind: event, longer work, short work, project, session with a local, community hour.
-- Who posted it, and whether they are a partner feed or a member.
-- Source name, licence or rights note, and `last_checked_at` for anything ingested.
-- When it starts, when it ends, and when the offer expires.
-- What is known about pay, in integer minor units and an explicit currency. Missing pay stays missing.
-- What the person is offering to do, distinct from whether they are free, distinct from whether they are qualified.
-- A supply band, so the screen can say the caveat in plain language.
-- Demo flag. Demo never counts as supply.
-
-Matching rules that are already law:
-
-- Capability is not willingness. Willingness is not availability.
-- A journey is not availability and not a live location.
-- Living in a place is not serving that place. Selecting a place is not travelling through it.
-- Skill is not a role and not a qualification.
-- Regulated work (construction, electrical, gas, food for sale, transport of people, childcare, health, legal, financial) is never shown as “qualified” unless the record itself carries a checked qualification. If it does not, exclude it or show the caveat. Do not let a model upgrade it.
+The **engine** is ready to grow. The **market** is not. What you have is a honest skeleton: one matcher, one place model, one ingest pipe, a demo city, and a queue of scale fixes that are not merged. ChatGPT’s job is to finish that skeleton for one real city, on a map a person can actually use, and only then repeat it. Building Deliveroo, Uber, Indeed, and Too Good To Go as four new apps would throw away the only advantage you have.
 
 ---
 
-## 4. Heartbeat — stop scrolling
+## 2. The product, including the new work
 
-Design every screen so a session has an end.
+One record. Many doors. The map is the home screen.
 
-- Open on a place, not on a global feed.
-- Show a handful of things that are recorded. Three is the default for “today” and “a few hours”.
-- Each card is a real next step: go, ask, offer, save. Not a like.
-- No infinite scroll of suggested strangers. No follower counts. No streak.
-- “People like you” means people gathered around the same real thing: this gig, this night, this project, this lesson.
-- After they commit, the app should feel finished. A short confirmation, then nothing left to browse.
-- Empty is designed, not shameful: “Nothing recorded here yet. Be the one who puts it on.”
-- Photography and type may follow the redesign reference. Behaviour follows this file.
+| Door | Person | First supply | Later | Never |
+|---|---|---|---|---|
+| What’s on | Tonight, this week | Ticketmaster, labelled | Venues and artists posting a night | A fake box office |
+| Longer work | A listed job | Adzuna, once wired and rights-cleared. Other boards only under contract | Employers posting here | Scraping Indeed or Seek |
+| Short work | A shift, a garden, a clean | A business or a neighbour posts it, with an expiry | Same | Calling someone a licensed tradesperson |
+| Delivery, day one | “I landed today. What needs carrying?” | Shops and kitchens post “rider needed 12–3” with vehicle and area | Denser same-day posts | Live GPS dispatch, or pretending they are hired by Deliveroo |
+| Removals and bigger work | A van, two people, a house | A household or a firm posts the job, the window, and what is not included | Repeat local firms | “Insured mover” unless a reviewed credential says so |
+| Surplus food | Eat what would be wasted | A kitchen posts portions, a pickup window, and a price or “free” | Many kitchens in one city | Scraping Too Good To Go. Guessing allergens |
+| Music | Artist, room, fans | API shows, labelled | Empty night + artist need | The app taking the door money in v1 |
+| Projects | Weeks, a bed, real work | Hosts post in their own words | A region of projects | Scraping WWOOF or Workaway |
+| With a local | A lesson, a crossing, a meal | A person offers hours | Confirm before travel | A checkout |
+| People | Like-minded, around a thing | The gig, the night, the project | A conversation tied to that record | A follower feed |
 
-The current public UI (The Living World) already has the bones: place, eight layers, a rough map, happening soon, do something today, a few hours, journey, give an hour. The redesign is the calmer, more photographic version of those bones. Merge the look later, in small PRs, after the owner has said which parts of the current screens to keep. Do not restyle and re-platform in the same PR.
+**Day one in a new area** means: they set the place to where they are, say what they can do from today (walk, bike, car, van, hands), and see posts that are actually open. It does not mean the app employs them, insures them, or signs them into Uber. Those companies keep their own onboarding. You are the map that shows the work.
 
----
-
-## 5. Scale shape for millions of daily users
-
-Millions of daily users is a **read** problem if the product is built correctly. It is a disaster if every open calls a model or a partner API.
-
-Illustrative load, so the shape is obvious, not a promise:
-
-- 5 million daily people, 20 opens each = 100 million reads a day. Average a bit over 1,000 reads a second. Peaks several times that.
-- Those reads must be a **cached bundle for a place**, not a fresh query per phone.
-- 95% from a CDN or edge cache. Origin and Postgres then see a few hundred reads a second. That is ordinary.
-- Partner calls are per place, not per person. Ten thousand active places, refreshed on a schedule, is hundreds of thousands of calls a day, deduped. A million people in one city still cost one refresh.
-- Member writes are the small stream. Even if 2% post once a day, that is on the order of 100,000 writes a day.
-- Model calls on the read path: **zero.**
-
-Architecture:
-
-1. **Stateless app servers.** The web app already deploys as a server-rendered app. Keep discovery pure and testable in `findSupply` / `groundedMatch`. No global in-memory feed.
-2. **Postgres (the existing Supabase project) is the system of record.** Index by canonical place id, kind, time window, and expiry. Do not add a graph database or a vector index for discovery. ADR 001 forbids it.
-3. **Locality bundle.** For each place and layer, a JSON document of the eligible public records, small, with a hash and a generated-at time. Cache it. Invalidate it when a record in that place changes or a refresh lands. The phone downloads the bundle and renders it.
-4. **Ingest workers, separate from the web process.** One queue. Each job is “refresh source X for place Y”. Idempotent. Backoff. A failed partner does not blank the last good bundle; it shows the last-checked time and ages out when `expires_at` passes.
-5. **Reads scale out. Writes stay simple.** One primary database until a measured bottleneck. Read replicas and a second region only after a load test says so. Do not start with multi-region complexity.
-6. **A place is the tenant of the cache, not the user.** Personalisation is a filter on the bundle (hours, spend, company, outdoors, theme). It is not a private ranking model.
-7. **Feature flag per locality.** One city can be live. The rest of the world stays honest and quiet. This is how you go global without faking global.
-8. **Abuse and moderation scale with posts, not with page views.** Budget for a report queue, rate limits on `make` / `give` / `need`, and a human steward per live city. Issue #290 (durable abuse controls) is a launch blocker for anything that calls a model or accepts anonymous floods.
-9. **Target, once a city is real:** a cached home in the low hundreds of milliseconds, a bundle measured in tens of kilobytes, and a test that a quiet place returns an empty list rather than filler.
-
-What will actually hurt at millions: trust, stale jobs, duplicate events, and moderation. Not the web server. Build for those.
+**Waste** means a real portion with a real clock. When the window ends, the card dies. That is the product. A model must not invent a bakery’s leftovers.
 
 ---
 
-## 6. Outsourced first, then members
+## 3. The map is the product (Airbnb’s lesson, not Airbnb’s business)
 
-Order is fixed.
+Airbnb works because the map and the list are the same search. Pins are easy to read. Filters are few. A card says the facts. Empty areas stay empty.
 
-**Stage A — labelled outside supply**
+Build that interaction on the map you already have. Do not import Airbnb listings.
 
-- Events: finish the Ticketmaster path through `src/lib/ingest/` so a real place can show shows that are actually on sale. Every card says the source and when it was checked. It links onward for tickets. This app is not the ticket seller yet.
-- Longer work: Adzuna is the first board. Indeed and Seek are the same *shape*, but only after a written contract and a licence field. Do not scrape them. Do not put their logos up as if there were a partnership.
-- Dedupe with the existing dedupe module. A job that appears on two boards is one row with two sources, or it is suppressed. Never two cards for one shift.
-- Expiry and cancellation are part of the adapter, not a later cleanup.
-- Raw partner JSON is never what the UI reads. Normalise, then `findSupply`.
+- One screen: map plus list. Selecting a pin selects the card. Moving the map asks “search this area” only within canonical places you already support. Do not draw a pin for a person.
+- Filters are the themes plus time (now, today, this week) plus kind (event, job, gig, delivery, removal, surplus, project).
+- A pin shows time and price **only when the record has them**. Unknown price is not free. There is open work on this (#391, #402). Finish that before you show prices.
+- Pins are approximate. The exact door is shared after both sides agree.
+- The list is short. “Happening now”, then “today”, then “this week”. Not an infinite scroll.
+- Demo rows never appear on a place marked live.
 
-**Stage B — members post the things feeds will never have**
-
-- A short gig. “Kitchen hands Saturday, paid the same day.”
-- A venue holding an empty night.
-- An artist who needs that night.
-- A project that needs people for two weeks and has a bed.
-- A person who will spend a morning teaching a language.
-- A neighbour who needs a garden dug.
-
-These are the same record, source = member, band = direct or contribution or skills exchange, with an expiry. Draft assist may help them write. It may not add a wage, a date, or an address they did not type. Nothing publishes itself.
-
-**Stage C — density**
-
-A city graduates from “mostly sourced” to “mostly ours” when member rows outnumber partner rows and a steward can keep them fresh. Do not flip a global switch. Flip a place.
-
-Never fill a gap with a model. A gap is the invitation.
+The current emoji grid is the thing to replace, after the owner says so, and only as a presentation change over the same records.
 
 ---
 
-## 7. Work
+## 4. How the information is organised
 
-Two products inside one engine.
+Perfect organisation is a schema, not a prettier feed.
 
-**Longer work (Indeed / Seek kind).**
-Ingested `WorkOpportunity` rows. Show title, place, pay if the source gave it, contract type if the source gave it, source, last checked. Applying goes to the source until the owner decides this app takes applications. Do not imply the job is still open if `last_checked_at` is old. The work-opportunity presentation module is the UI seam. Keep the publication gate: sourced jobs stay unpublished until rights and review say otherwise. That gate is already the rule. Do not quietly open it.
+Every public card is one record:
 
-**Short work (a day or a week).**
-Cleaning a flat, a garden, a market stall, a pair of hands on a site. Member-posted. Fields: task, place, window, hours, pay or “pay not stated”, tools, and whether it is physically hard. Expires when the window ends.
+- Place id from the hierarchy. Not a live dot.
+- Kind: event, longer work, short work, delivery, removal, surplus food, music night, project, session with a local.
+- Who: partner feed or member.
+- Source, rights, `last_checked_at`, `expires_at`.
+- Start and end. Delivery and surplus are often hours, not days.
+- Pay in minor units and a currency, or explicitly unknown.
+- For delivery and removals: vehicle (none, bike, car, van), how many people, how heavy, what area they cover.
+- For surplus: portions, pickup window, dietary notes **only if the kitchen typed them**.
+- Band and caveat, rendered by the app, not rewritten by a model.
+- Demo flag.
 
-Construction is on the regulated list. A card may say “they asked for labour on a build”. It must not say “builder”, “licensed”, or “safe” unless a qualification review exists. Electrical, gas, and anything structural stay out until that review exists. Gardening and ordinary cleaning can ship earlier.
+`findSupply` already knows how to separate “they posted this” from “they said they can” from “they are passing through”. Delivery uses the same bands. A rider who says they can deliver is `local_capability` until they accept a posted shift. Accepting is a conversation, not an automatic dispatch.
 
-Airbnb the company is not integrated. “Cleaning a short-stay flat” is just a short-work record a host posts. Do not use Airbnb’s brand, and do not pull their private calendars.
-
-Matching: the person says the places they will work and the work they will do. `geo-scope` decides reach. The band caveat stays on the card. “I can garden” is not “I am free Tuesday”.
-
----
-
-## 8. Music — artists, fans, venues, without the middle
-
-Purpose: a new artist can find a room, a venue can fill an empty night, a fan can see it because it was recorded here. Big ticketing companies are a *source* for shows that already exist, not the only way a night can happen.
-
-**From APIs.** Ticketmaster (and later other licensed event APIs) for announced shows. Label them. Do not copy their inventory into a fake box office.
-
-**From people.** Three roles, all members, all optional:
-
-- Venue: “We have Tuesday from 8, 80 people, door take or a small fee, you bring the sound.” Capacity and terms are theirs.
-- Artist: “We need a room this month, 45 minutes, we can bring 30 people.”
-- Fan: save the night, or say they will come. A save is not a ticket and not a promise of a crowd.
-
-`findSupply` connects an artist’s need to a venue’s offer in the same place and overlapping dates. The screen shows the two records and the caveats. The people confirm with each other in the existing conversations path. The app does not invent a booking.
-
-**Not in the first music release:** taking payment, issuing tickets, holding deposits, streaming recorded music, or replacing a performing-rights licence. Say plainly when a night is “agreed between artist and venue” versus “listed by Ticketmaster”. A pop-up in a kitchen is allowed. Pretending it is a permitted public concert is not.
-
-Growth of this door is how the community starts to feel like a scene: repeat nights, the same room, new names. Still no follower feed. The history of a room is a list of nights that happened, written by the people who were there, and private memories stay private.
+Regulated kinds stay harsh. Food for sale, transport of people, electrical, gas, and structural construction cannot look qualified. Delivery of prepared food shows the kitchen’s own allergen note or no note. Removals do not say “insured”.
 
 ---
 
-## 9. Community projects — the WWOOF / Workaway kind
+## 5. Scale, from startup to global
 
-A project is not a gig and not a job.
+You do not scale by launching every feature in every country. You scale by making one place fast and true, then repeating a checklist.
 
-Fields: place, what the work actually is, how many hours a day, how many days, whether there is a bed or a meal, who else is there, what it costs (often nothing, sometimes a contribution), and what the host will not pretend to offer.
+### The shape that holds millions of daily users
 
-Band: contribution or skills exchange, not “paid role”, unless money is really offered.
+- **Reads are cached bundles.** One JSON document per place, per layer, per time window. CDN in front. A million people in one city cost one refresh.
+- **Partner calls are per place, on a schedule,** inside the existing refresh worker. Cap pages. A dark partner leaves the last good bundle and a visible last-checked time.
+- **Writes are small.** Posts, accepts, reports. Rate-limited. Moderated.
+- **Models are off the read path.** On-device draft or explain only, from the bundle, on phones that already have a model. Server draft assist stays capped behind #290. No API keys from users. No vector brain.
+- **Postgres stays the record.** Indexes on place, kind, time, expiry. The open geography PRs (#396, #397, #400, #406) exist because unbounded place scans will not survive growth. Land those fixes. Do not add a second geo stack.
+- **A feature flag per place and per kind.** Delivery can be on in one city and off where the law has not been reviewed. Surplus food likewise.
+- **One primary database** until a load test says otherwise. Replicas and a second region are earned, not drawn on a slide.
 
-Rules:
+Illustrative, not a promise: 5 million people, 20 opens a day, is about 100 million reads. If 95% hit cache, origin stays ordinary. The bill that grows is moderation and partner refresh, not page views.
 
-- A bed is not availability of the host, and not consent to anything off the page.
-- The host’s exact address is shared only after both sides agree, never on the public map.
-- “Like-minded” is the project’s own description (a farm, a rebuild, a kitchen, a festival build), not a personality score.
-- No scraping of WWOOF, Workaway, or HelpX. People who want those visitors post the project here, in their own words.
-- Safety: report, block, and a steward. Stays of more than a few days are a higher moderation bar than a two-hour gig. Ship the short gig first.
+### The market sequence
 
----
+1. **One wedge city the owner names.** Not demo Lisbon. Three live kinds only: sourced events, member short-work (including a delivery post and a removal post), and surplus food from kitchens who type it themselves. Map + list.
+2. **Prove the cache** and a week of moderation with a named steward.
+3. **Wire Adzuna** only after rights review, into the existing registry, still unpublished until the work-opportunity gate says yes.
+4. **A second and third city in the same country** (same currency, same clock, same law). Same checklist. No new architecture.
+5. **A second country** only with the readiness record: hierarchy, currency, timezone, taxonomy, rights, moderation, steward, indexability. Australia stays off until that record is approved.
+6. **Density, not breadth.** A city graduates when member posts are fresher than the partner feed. Then add music nights and multi-day projects there. Not before.
+7. **You take on the big companies by being the one map,** not by owning their fleets. Uber keeps the dispatch. Deliveroo keeps the rider contract. Ticketmaster keeps the ticket. Indeed keeps the apply-button until you choose otherwise. People open you because the garden, the van, the unsold meals, the empty venue, and the afternoon shift are in one calm place.
 
-## 10. With a local — the GetYourGuide kind, without the marketplace tax
-
-A visitor wants a person, not a package. Learn Spanish in a city in South America. Island-hop with someone who lives in Indonesia. Cook, walk, fish, rehearse.
-
-This is an experience record:
-
-- Place, language, size of group, hours, what you will actually do, what it costs or that cost is unstated, what the guest must be able to do.
-- The host confirms before anyone travels or pays. The card says “not a booking” until a real booking system exists. Do not build payments in the same PR as the form.
-- Suggestions never outrank an empty truth. If nobody in that town has offered to teach, the page says so.
-- The host sets the area they will meet people in. The visitor’s holiday route is a journey (`journey-engine`, `road-trip`). A journey is not the host’s live location.
-
-Do not scrape GetYourGuide, Viator, or Airbnb Experiences. Do not show their prices as if they were ours.
+What you refuse, even under pressure: fake listings to look busy, a global “now live” banner, a courier GPS trace, a star rating, an infinite people feed.
 
 ---
 
-## 11. Like-minded people, without a social network
+## 6. AI
 
-Connection is a side effect of a true plan.
+Unchanged, and stricter because delivery and food are time-critical.
 
-- You see someone because they posted the thing, or they are in the same project, or they answered.
-- Conversations already exist as a route. They stay tied to a record.
-- Life list is personal plans, not a broadcast.
-- Memories are owner-only and must not enter `findSupply`, sitemaps, or “people near you”.
-- No contact graph import. No “people who viewed you”. No ranking of humans.
-- Block and report apply everywhere a person is visible.
-
-The community ecosystem is the sum of rooms, projects, gigs, and lessons in a place over time. It is not a feed.
+- The map does not call a model to decide what is on.
+- A phone model may explain a card or draft the user’s own post. It may not add a wage, a pickup time, an allergen, or a softer caveat.
+- “Ask this place” stays off until citations, same-place isolation, and injection tests exist.
+- Tokens are not how you get global data. Kitchens, venues, households, and licensed feeds are.
 
 ---
 
-## 12. AI, and who pays for tokens
+## 7. Design
 
-The model is not the product. The records are.
+The owner is art-directing from the current Living World screens before a visual merge. Wait for that.
 
-- Map, theme, search, journey, and “what’s on” call **no** model.
-- A phone that has an on-device model (Apple’s on-device model, Gemini Nano) may draft or explain **from the bundle already downloaded**. The company pays no token. The model may not add facts, and it may not rewrite the band caveat.
-- Phones without a local model still get the full product. The cards are enough.
-- Server draft assist is the fallback only, behind `DRAFT_ASSIST_DISABLED`, the unproven quota, and issue #290. Do not raise limits to “feel global”.
-- Do not ask members for their own API keys.
-- “Ask this place” stays off until the grounded-assistant document’s gates are met: eligible records only, citations, same-place isolation, prompt-injection tests, no writes, no retention by default.
-- Do not add a vector brain to get smarter at millions of users. It would invent neighbours and bill every open. Extend `findSupply`.
+When it starts: tokens and type, then cards, then the Airbnb-style map, then phone navigation. Facts only. No prototype photos as evidence. One surface per pull request. The redesign repo is a reference, not a runtime.
 
 ---
 
-## 13. Design
+## 8. Safety and law
 
-The owner is art-directing from the **current** public app before a visual merge. Do not start a redesign PR until they say which of these to change: photography and type, the map, the phone navigation, the demo label.
-
-When they do:
-
-- Port tokens, type, and card layout from the redesign reference onto existing components (`entry-card`, home, explore, map).
-- Keep canonical props and data. A card shows only supplied facts.
-- One token set. Fraunces and Manrope are the intended faces. No second theme.
-- Map pins stay approximate.
-- Do not import prototype photos as evidence of a real place.
-- Check 375px and 1280px, keyboard, focus, and empty states.
-- One surface per PR.
+- Delivery and removals can involve roads, insurance, and the right to work. The card is an introduction. It is not employment, not a background check, and not cover.
+- Surplus food is food for sale or gift. Show only what the kitchen wrote. Do not add “safe” or “healthy”.
+- Exact addresses stay off the public map.
+- Payments, escrow, and in-app tickets are a later project with the owner. Until then, say “not a booking”.
+- New country, new steward, new flag. Agents do not flip the flag.
 
 ---
 
-## 14. Safety, law, and money
+## 9. What to build, in order
 
-- Addresses: public map is place-level. The exact door is shared after both people agree.
-- Payments, escrow, deposits, and ticketing are a separate, owner-approved project. Until then, every card that could be mistaken for a checkout says it is not one.
-- Employment law, insurance, and visas for multi-week stays differ by country. The card must not say “legal”, “insured”, or “visa-friendly” unless a reviewed source says so.
-- Partner terms of service are a human decision. An agent may not open a new source.
-- A market is not live because a pin exists. The readiness list in `docs/ai/GROUNDED-ASSISTANT-AND-GLOBAL-INTEGRATION.md` still applies: hierarchy, currency, timezone, taxonomy, rights, moderation, steward, indexability. Australia stays not live until that record is approved.
-- Demo Lisbon stays labelled demo.
+Each item is one or more small pull requests. Do not skip.
 
----
+### Phase 0 — land the scale fixes already in review
 
-## 15. Phased work — do these in order
+Do not rewrite them. Rebase, finish, and ask a human to merge, in an order that does not fight:
 
-Each phase is several small PRs. Do not skip ahead because the later phase is more exciting.
+- Geography: no full-table scans, bounded pagination (#396, #397, #400, #406 and their stacks).
+- Ingest: atomic provenance, fail closed, locality resolved before anything is public (#393, #403, #407).
+- Price: unknown is not free (#391, #402).
+- Leave the destinations directory (#394) and GeoNames manifest (#395) until the owner says that directory is in scope. Read them. Do not fork them.
 
-### Phase 0 — already done
+**Done when:** `main` can resolve a locality and refresh a source without a 400-place scan and without wiping good rows on failure.
 
-Engine, geography, ranking, themes, ingest seams, draft assist (dark), home, journey, give, need, make. Confirm by reading, not by rewriting.
+### Phase 1 — one real city on a real map
 
-### Phase 1 — one real city, still honest
+1. Owner names the city. Lisbon stays demo.
+2. Trace Ticketmaster from registry to card. Turn it on for that city only if credentials and rights are already approved. If they are not, stop and ask.
+3. Locality bundle: place + layer + window, cached. Second request must not call Ticketmaster. Test that.
+4. Map + list of those rows. Approximate pins. Empty state if the feed is quiet.
+5. Deploy story is a human decision. GitHub `main` and the Lovable site are not the same thing today. Do not claim the site updated until `/explore` and robots match the repo.
 
-**Goal:** a single non-demo locality can show sourced events and sourced longer-work, or an honest empty state, from a cached bundle.
+**Done when:** a stranger sees sourced, unexpired events, or an honest empty map. No demo rows.
 
-Tasks:
+### Phase 2 — short work, delivery, removals
 
-1. Pick the locality with the owner. Do not assume Lisbon. Lisbon on the public site is demo.
-2. Trace Ticketmaster and Adzuna from adapter to a public card. Document what is still fixture, what is unpublishable, and what the rights gate blocks. Write that in the PR. Change only what is needed to make the gate explicit.
-3. Add the locality bundle (place + layer + time window) as a read model in front of existing queries. Cache it. Test that a second request does not call the partner.
-4. Empty, stale, and duplicate tests. A dead partner leaves the last good bundle and a visible last-checked time.
-5. Load-test the cached read of that one place. Record the number. Do not tune before you have it.
+On the existing make / give path. Not a new app.
 
-**Done when:** a stranger can open that place and see only sourced, unexpired rows, each with a source, or a quiet page. Demo data is not in the list.
+- Kinds: short work, delivery, removal.
+- Delivery fields: window (can be today), vehicle, area, pay or unknown, how many people.
+- Removal fields: window, van or not, how many people, what is excluded. No “insured” or “licensed” unless a reviewed field exists.
+- A person can say “I can do this in this place from today” without that sentence becoming a shift. The shift is a post they accept in conversation.
+- Expiry is enforced. A lunchtime delivery disappears after the window.
+- Construction and anything structural stay excluded or caveated. Test that.
+- Rate-limit posts. Reports go to the existing moderation route.
+- These rows join the same bundle, visually distinct from Ticketmaster.
 
-### Phase 2 — short work from members
+**Done when:** a shop can post “bike needed 12–3” and someone who just set that city can see it today, and a regulated trade cannot look qualified.
 
-**Goal:** a person can post a gig that expires, and another person in that service area can find it through `findSupply`.
+### Phase 3 — surplus food
 
-Tasks:
+- A kitchen posts portions, pickup window, price or free or unknown, and optional notes they typed.
+- Card dies at `expires_at`.
+- Food-for-sale caveat is fixed copy from the app, not from a model.
+- No Too Good To Go scrape, no logo, no implied partnership.
+- Same bundle, kind `surplus`.
 
-1. Extend the existing make/give flow. Do not add a new “gigs app”.
-2. Required fields: task, place, window, expiry, pay-or-unstated. Optional tools and how hard it is.
-3. Construction and other regulated kinds: either excluded or forced through the caveat. Add a test that an unqualified construction post cannot read as a licensed trade.
-4. Rate-limit posting. Wire reports to the existing moderation route.
-5. The gig appears in the same bundle as Phase 1, band direct, source member, visually distinct from Adzuna.
+**Done when:** a quiet afternoon shows no fake meals, and a real post cannot outlive its window.
 
-**Done when:** the poster can see their own expiry, a neighbour can find it, and a regulated post cannot look qualified.
+### Phase 4 — longer work
 
-### Phase 3 — music nights between people
+- Register Adzuna only after a human confirms the contract and the publication gate.
+- Same dedupe and freshness as events.
+- Apply stays on the source until the owner says otherwise.
 
-**Goal:** a venue can post an empty night, an artist can post a need, both show up through the engine, and a fan can save the night.
+### Phase 5 — music, projects, time with a local
 
-Tasks:
+As in the previous plan, still on this engine: venue night and artist need, no in-app ticket; multi-day projects with address hidden until both agree and a steward exists; a lesson or a local route that is not a checkout and not a live location.
 
-1. Two forms on the existing make path, not a new product.
-2. Match on place and overlapping dates only. Show both records. Do not auto-book.
-3. Ticketmaster rows remain visibly “from the source”.
-4. Conversation deep-link from the pair of records, using the existing conversations route.
-5. Copy test: nothing on this screen says the app sold a ticket.
+### Phase 6 — look, then language, then the next cities
 
-**Done when:** an artist and a venue in the same city can find each other, and a fan can save that night, with no payment code added.
-
-### Phase 4 — projects and time with a local
-
-**Goal:** multi-day projects and “spend a few hours with someone who lives here” use the same record and the journey engine.
-
-Tasks:
-
-1. Project fields from section 9. Session fields from section 10.
-2. Exact address hidden until both agree. Test this.
-3. Journey and road-trip can include these records. A journey never marks the host as “here now”.
-4. Steward flag for the locality before projects of more than a weekend can be public. If there is no steward, the form says so and does not publish.
-
-**Done when:** a short project and a short lesson can be posted, found, and clearly distinguished from a job and from a ticketed event.
-
-### Phase 5 — the heartbeat UI
-
-**Goal:** the owner’s chosen visual changes, on the existing screens, after they have directed the design.
-
-Tasks:
-
-1. Wait for the owner’s notes on the current Living World screens.
-2. Tokens and type first.
-3. Cards second, facts only.
-4. Map third.
-5. Phone navigation last.
-6. No prototype data in any of these PRs.
-
-### Phase 6 — language on the phone, still not a brain
-
-**Goal:** where the phone has a local model, draft and explain run there. Where it does not, the cards stand, and server draft assist remains capped.
-
-Tasks:
-
-1. Do not start until #290 is done and the owner has turned the fallback on.
-2. Feature-detect. No model download of multiple gigabytes inside the site.
-3. Prompt fixture tests: the model cannot add a wage, a date, a qualification, or a softer caveat.
-4. Measure server draft volume. If it grows with page views, you have wired it wrong.
-
-### Phase 7 — many places
-
-**Goal:** repeat Phase 1’s checklist per locality. A country is a set of ready places, not a launch banner.
-
-Tasks:
-
-1. Locality readiness record, from the grounded-assistant doc, filled in for real.
-2. Turn the flag on for that place only.
-3. Steward named. Moderation queue watched for a week before the next place.
-4. Add a new partner source only with a contract, as a new file under `src/lib/ingest/`, registered in the existing registry.
-
-**Done when:** ten places can be busy or quiet independently, and the cache still absorbs the reads.
+- Visual merge only after the owner’s notes on the current screens. Map interaction from section 3 is the priority.
+- On-device language only after #290.
+- Next city: repeat Phase 1’s checklist. Same country before a new country.
 
 ---
 
-## 16. Definition of “live”
+## 10. Definition of live
 
-A place is live when all of these are true:
+A place is live when:
 
-- Its page is not marked demo.
-- Every public row is member-posted or partner-sourced, with rights and a last-checked time.
-- Expired rows are gone.
+- It is not marked demo.
+- Every public row is member-posted or partner-sourced, with rights and last-checked.
+- Expired delivery, surplus, and shifts are gone.
 - The bundle is cached.
+- The map and the list match.
 - Empty layers say they are empty.
 - Report, block, and a named steward work.
-- Regulated work cannot look qualified.
-- No model is on the read path.
+- Delivery and food do not claim employment, insurance, or safety they do not have.
+- No model runs on the read path.
 - The owner has said the place is live.
 
-The world is not “live” as a single switch. The app is global because the same system runs everywhere, and only ready places speak.
+---
+
+## 11. What every session reports
+
+Pull-request body: base SHA, branch, files, phase, what you refused to build, tests and the real result, human decisions still open.
+
+If the task needs a scrape, a dispatch tracker, a payment provider, a second matcher, or invented leftovers: stop and ask.
 
 ---
 
-## 17. What every ChatGPT session must report
+## 12. Start the next session here
 
-In the PR body:
+1. Read section 1 so you do not rebuild the engine or ignore the open geography and ingest pull requests.
+2. Do Phase 0 as review comments and rebases, not as a new design. If those pull requests are stale against `main`, say so and stop.
+3. Do not start delivery, surplus, or a visual merge until Phase 1 has a named city and a cached sourced map.
 
-- Base SHA, branch name, files touched.
-- Which phase and task.
-- What you refused to build.
-- Tests run and the actual result.
-- Whether a human still owes a decision (source contract, steward, design, payments, turning a place live).
-
-If a task needs a new matcher, a scrape, a payment provider, a vector index, a second app, or a model that fills empty cities: stop and write the question. Do not improvise.
-
----
-
-## 18. Start here, next session
-
-1. Read the files in section 0 and section 2.
-2. Do Phase 1, task 2 only: a written trace of Ticketmaster and Adzuna from adapter to card, as a docs or test PR, no behaviour change unless you find they can already show a sourced row and the test is missing.
-3. Stop. Wait for the owner on which city is first, and on the visual direction from the current Living World screens.
-
-The product grows by adding doors onto one engine, one place at a time. That is how it becomes large without becoming fake. The point of the size is not the size. The point is that someone, anywhere the place is ready, can find a real thing to do with a real person, and then put the phone away.
+The way you become the life app is not by cloning each corporation. It is by putting their kind of fact, and the facts only a local person knows, on one map that stays fast when millions of people open it, and then getting out of the way.
