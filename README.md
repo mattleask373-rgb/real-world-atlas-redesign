@@ -34,3 +34,7 @@ It is **not** the live product, **not** a second backend, and **not** something 
 4. A human merges. Do not merge it yourself.
 
 This package is newer than the October 2026 `grok-workspace.zip` that was inventoried but never committed. Use this repository as the readable source. The notes already in `docs/design/grok-reference/` on the live repo still apply; this repo adds the actual screens.
+
+## Systems merge
+
+The live app, the AI rules, and the merge sequence are in [life-lived-network#410](https://github.com/mattleask373-rgb/life-lived-network/pull/410). This repo stays a design reference.
